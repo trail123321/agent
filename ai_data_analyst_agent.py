@@ -30,9 +30,27 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, SystemMessage
 
-# AgentExecutor and create_openai_tools_agent - correct imports for LangChain 0.1.20
-from langchain.agents import create_openai_tools_agent
-from langchain.agents.agent import AgentExecutor
+# AgentExecutor and create_openai_tools_agent - handle different LangChain versions
+try:
+    # Try standard import (LangChain 0.1.0+)
+    from langchain.agents import AgentExecutor, create_openai_tools_agent
+except ImportError:
+    try:
+        # Try alternative import path
+        from langchain.agents.agent import AgentExecutor
+        from langchain.agents import create_openai_tools_agent
+    except ImportError:
+        try:
+            # Another alternative
+            from langchain.agents.agent_executor import AgentExecutor
+            from langchain.agents import create_openai_tools_agent
+        except ImportError:
+            # Fallback - this should work for most versions
+            import langchain.agents as agents_module
+            AgentExecutor = getattr(agents_module, 'AgentExecutor', None)
+            if AgentExecutor is None:
+                from langchain.agents.agent import AgentExecutor
+            from langchain.agents import create_openai_tools_agent
 
 # Report generation
 import markdown
