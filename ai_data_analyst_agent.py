@@ -227,16 +227,17 @@ class DataAnalystAgent:
             except Exception as e:
                 return f"Error in analysis: {str(e)}"
         
-        def create_visualization(chart_type: str, x_column: str, 
+        def create_visualization(chart_type: str, 
+                               x_column: Optional[str] = None,
                                y_column: Optional[str] = None,
                                title: Optional[str] = None,
                                **kwargs) -> str:
             """Create and save a visualization.
             
             Args:
-                chart_type: Type of chart (histogram, scatter, bar, line, box, heatmap, pairplot)
-                x_column: Column name for x-axis
-                y_column: Column name for y-axis (optional)
+                chart_type: Type of chart (histogram, scatter, bar, line, box, heatmap)
+                x_column: Column name for x-axis (required for most chart types, optional for heatmap)
+                y_column: Column name for y-axis (optional, required for scatter and line)
                 title: Chart title (optional)
                 **kwargs: Additional chart parameters
                 
@@ -254,51 +255,84 @@ class DataAnalystAgent:
                 
                 plt.figure(figsize=(12, 8))
                 
-                if chart_type == "histogram":
+                if chart_type == "heatmap":
+                    # Heatmap doesn't need x_column
+                    numeric_df = df.select_dtypes(include=[np.number])
+                    if len(numeric_df.columns) > 1:
+                        sns.heatmap(numeric_df.corr(), annot=True, fmt='.2f', cmap='coolwarm')
+                        if title:
+                            plt.title(title)
+                        else:
+                            plt.title("Correlation Heatmap")
+                    else:
+                        return "Error: heatmap requires multiple numeric columns"
+                
+                elif chart_type == "histogram":
+                    if not x_column:
+                        # Use first numeric column if x_column not provided
+                        numeric_cols = df.select_dtypes(include=[np.number]).columns
+                        if len(numeric_cols) > 0:
+                            x_column = numeric_cols[0]
+                        else:
+                            return "Error: histogram requires x_column or numeric data"
                     df[x_column].hist(bins=kwargs.get('bins', 30))
                     plt.xlabel(x_column)
                     plt.ylabel('Frequency')
+                    if title:
+                        plt.title(title)
+                    else:
+                        plt.title(f"Histogram - {x_column}")
                 
                 elif chart_type == "scatter":
-                    if y_column:
-                        plt.scatter(df[x_column], df[y_column], alpha=0.6)
-                        plt.xlabel(x_column)
-                        plt.ylabel(y_column)
+                    if not x_column or not y_column:
+                        return "Error: scatter plot requires both x_column and y_column"
+                    plt.scatter(df[x_column], df[y_column], alpha=0.6)
+                    plt.xlabel(x_column)
+                    plt.ylabel(y_column)
+                    if title:
+                        plt.title(title)
                     else:
-                        return "Error: scatter plot requires y_column"
+                        plt.title(f"Scatter Plot - {x_column} vs {y_column}")
                 
                 elif chart_type == "bar":
+                    if not x_column:
+                        return "Error: bar chart requires x_column"
                     if y_column:
                         df.groupby(x_column)[y_column].mean().plot(kind='bar')
+                        plt.ylabel(y_column)
                     else:
                         df[x_column].value_counts().head(20).plot(kind='bar')
+                        plt.ylabel('Count')
                     plt.xlabel(x_column)
-                    plt.ylabel(y_column or 'Count')
                     plt.xticks(rotation=45, ha='right')
+                    if title:
+                        plt.title(title)
+                    else:
+                        plt.title(f"Bar Chart - {x_column}" + (f" vs {y_column}" if y_column else ""))
                 
                 elif chart_type == "line":
-                    if y_column:
-                        df.plot(x=x_column, y=y_column, kind='line')
+                    if not x_column or not y_column:
+                        return "Error: line plot requires both x_column and y_column"
+                    df.plot(x=x_column, y=y_column, kind='line')
+                    if title:
+                        plt.title(title)
                     else:
-                        return "Error: line plot requires y_column"
+                        plt.title(f"Line Chart - {x_column} vs {y_column}")
                 
                 elif chart_type == "box":
+                    if not x_column:
+                        return "Error: box plot requires x_column"
                     if y_column:
                         df.boxplot(column=y_column, by=x_column)
                     else:
                         df[x_column].plot(kind='box')
-                
-                elif chart_type == "heatmap":
-                    numeric_df = df.select_dtypes(include=[np.number])
-                    if len(numeric_df.columns) > 1:
-                        sns.heatmap(numeric_df.corr(), annot=True, fmt='.2f', cmap='coolwarm')
+                    if title:
+                        plt.title(title)
                     else:
-                        return "Error: heatmap requires multiple numeric columns"
+                        plt.title(f"Box Plot - {x_column}" + (f" by {y_column}" if y_column else ""))
                 
-                if title:
-                    plt.title(title)
                 else:
-                    plt.title(f"{chart_type.title()} - {x_column}" + (f" vs {y_column}" if y_column else ""))
+                    return f"Error: Unsupported chart type: {chart_type}. Supported types: histogram, scatter, bar, line, box, heatmap"
                 
                 plt.tight_layout()
                 plt.savefig(fig_path, dpi=300, bbox_inches='tight')
@@ -310,7 +344,8 @@ class DataAnalystAgent:
             except Exception as e:
                 return f"Error creating visualization: {str(e)}"
         
-        def create_plotly_viz(chart_type: str, x_column: str,
+        def create_plotly_viz(chart_type: str,
+                             x_column: Optional[str] = None,
                              y_column: Optional[str] = None,
                              title: Optional[str] = None,
                              **kwargs) -> str:
@@ -318,8 +353,8 @@ class DataAnalystAgent:
             
             Args:
                 chart_type: Type of chart (scatter, bar, line, histogram, box, heatmap)
-                x_column: Column name for x-axis
-                y_column: Column name for y-axis (optional)
+                x_column: Column name for x-axis (required for most, optional for heatmap)
+                y_column: Column name for y-axis (optional, required for scatter/line)
                 title: Chart title (optional)
                 
             Returns:
@@ -333,26 +368,41 @@ class DataAnalystAgent:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 html_path = self.output_dir / f"plotly_{chart_type}_{timestamp}.html"
                 
-                if chart_type == "scatter":
+                if chart_type == "heatmap":
+                    numeric_df = df.select_dtypes(include=[np.number])
+                    if len(numeric_df.columns) > 1:
+                        corr = numeric_df.corr()
+                        fig = px.imshow(corr, text_auto=True, aspect="auto", title=title or "Correlation Heatmap")
+                    else:
+                        return "Error: heatmap requires multiple numeric columns"
+                elif chart_type == "scatter":
+                    if not x_column or not y_column:
+                        return "Error: scatter plot requires both x_column and y_column"
                     fig = px.scatter(df, x=x_column, y=y_column, title=title)
                 elif chart_type == "bar":
+                    if not x_column:
+                        return "Error: bar chart requires x_column"
                     if y_column:
                         fig = px.bar(df, x=x_column, y=y_column, title=title)
                     else:
                         fig = px.bar(df[x_column].value_counts().head(20), title=title)
                 elif chart_type == "line":
+                    if not x_column or not y_column:
+                        return "Error: line plot requires both x_column and y_column"
                     fig = px.line(df, x=x_column, y=y_column, title=title)
                 elif chart_type == "histogram":
+                    if not x_column:
+                        # Use first numeric column if not provided
+                        numeric_cols = df.select_dtypes(include=[np.number]).columns
+                        if len(numeric_cols) > 0:
+                            x_column = numeric_cols[0]
+                        else:
+                            return "Error: histogram requires x_column or numeric data"
                     fig = px.histogram(df, x=x_column, title=title)
                 elif chart_type == "box":
+                    if not x_column:
+                        return "Error: box plot requires x_column"
                     fig = px.box(df, x=x_column, y=y_column if y_column else x_column, title=title)
-                elif chart_type == "heatmap":
-                    numeric_df = df.select_dtypes(include=[np.number])
-                    if len(numeric_df.columns) > 1:
-                        corr = numeric_df.corr()
-                        fig = px.imshow(corr, text_auto=True, aspect="auto", title=title)
-                    else:
-                        return "Error: heatmap requires multiple numeric columns"
                 else:
                     return f"Error: Unsupported chart type: {chart_type}"
                 
@@ -494,12 +544,12 @@ This report contains comprehensive analysis of the provided dataset.
             Tool(
                 name="create_visualization",
                 func=create_visualization,
-                description="Create static visualizations (matplotlib/seaborn): histogram, scatter, bar, line, box, heatmap. Returns path to saved image."
+                description="Create static visualizations (matplotlib/seaborn). Required: chart_type (histogram, scatter, bar, line, box, heatmap). For most charts, x_column is required. For scatter/line, both x_column and y_column are required. For heatmap, no columns needed. Returns path to saved image."
             ),
             Tool(
                 name="create_plotly_viz",
                 func=create_plotly_viz,
-                description="Create interactive Plotly visualizations: scatter, bar, line, histogram, box, heatmap. Returns path to saved HTML."
+                description="Create interactive Plotly visualizations. Required: chart_type (scatter, bar, line, histogram, box, heatmap). For most charts, x_column is required. For scatter/line, both x_column and y_column are required. For heatmap, no columns needed. Returns path to saved HTML."
             ),
             Tool(
                 name="build_dashboard",
