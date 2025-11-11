@@ -24,11 +24,15 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # LangChain imports
-from langchain.agents import AgentExecutor, create_openai_tools_agent
-from langchain.tools import Tool
+# Using LangChain 0.1.20 compatible imports
+from langchain_core.tools import Tool
 from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, SystemMessage
+
+# AgentExecutor and create_openai_tools_agent - correct imports for LangChain 0.1.20
+from langchain.agents import create_openai_tools_agent
+from langchain.agents.agent import AgentExecutor
 
 # Report generation
 import markdown
