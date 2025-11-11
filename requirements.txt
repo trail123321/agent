@@ -4,12 +4,12 @@
 streamlit>=1.28.0
 
 # Core Agent Framework
-# Pin to compatible versions
-langchain==0.1.20
-langchain-openai==0.1.8
-langchain-community==0.0.38
-langchain-core==0.1.52
-langgraph==0.0.65
+# Use compatible versions - langchain-openai 0.1.8 requires langchain-core>=0.2.2
+langchain-core>=0.2.2,<0.3.0
+langchain-openai>=0.1.8
+langchain>=0.2.0
+langchain-community>=0.2.0
+langgraph>=0.2.0
 
 # Data Analysis
 pandas>=2.0.0
