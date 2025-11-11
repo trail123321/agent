@@ -35,7 +35,13 @@ import markdown
 from jinja2 import Template
 
 # Set style
-plt.style.use('seaborn-v0_8')
+try:
+    plt.style.use('seaborn-v0_8')
+except OSError:
+    try:
+        plt.style.use('seaborn')
+    except OSError:
+        plt.style.use('default')
 sns.set_palette("husl")
 
 
